@@ -4254,6 +4254,8 @@ lyd_replace(struct lyd_node *orig, struct lyd_node *repl)
         orig->parent->child = repl;
     }
 
+    orig->parent = NULL;
+
     /* predecessor */
     if (orig->prev == orig) {
         /* the old was alone */
@@ -4284,6 +4286,9 @@ lyd_replace(struct lyd_node *orig, struct lyd_node *repl)
 finish:
     /* remove the old one */
     lyd_free(orig);
+#ifdef LY_ENABLED_CACHE
+    lyd_unlink_hash(orig, repl->parent);
+#endif
 }
 
 int
