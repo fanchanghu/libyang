@@ -1207,7 +1207,7 @@ lyd_new(struct lyd_node *parent, const struct lys_module *module, const char *na
 }
 
 static struct lyd_node *
-lyd_create_leaf(const struct lys_node *schema, const char *val_str, int dflt, int edit_leaf)
+lyd_create_leaf(struct lyd_node *parent, const struct lys_node *schema, const char *val_str, int dflt, int edit_leaf)
 {
     struct lyd_node_leaf_list *ret;
 
@@ -1223,14 +1223,18 @@ lyd_create_leaf(const struct lys_node *schema, const char *val_str, int dflt, in
     ret->value_type = ((struct lys_node_leaf *)schema)->type.base;
     ret->value_str = lydict_insert(schema->module->ctx, val_str ? val_str : "", 0);
     ret->dflt = dflt;
+    ret->parent = parent;
 
     if (edit_leaf && !val_str) {
         /* empty edit leaf, it is fine */
         ((struct lyd_node_leaf_list *)ret)->value_type = LY_TYPE_UNKNOWN;
     } else if (!lyp_parse_value(&((struct lys_node_leaf *)schema)->type, &ret->value_str, NULL, ret, NULL, NULL, 1, dflt)) {
+        ret->parent = NULL;
         lyd_free((struct lyd_node *)ret);
         return NULL;
     }
+
+    ret->parent = NULL;
 
 #ifdef LY_ENABLED_CACHE
     lyd_hash((struct lyd_node *)ret);
@@ -1244,7 +1248,7 @@ _lyd_new_leaf(struct lyd_node *parent, const struct lys_node *schema, const char
 {
     struct lyd_node *ret;
 
-    ret = lyd_create_leaf(schema, val_str, dflt, edit_leaf);
+    ret = lyd_create_leaf(parent, schema, val_str, dflt, edit_leaf);
     if (!ret) {
         return NULL;
     }
@@ -6928,12 +6932,12 @@ lyd_find_sibling_val(const struct lyd_node *siblings, const struct lys_node *sch
         break;
     case LYS_LEAF:
         /* used attributes: schema, hash */
-        target = lyd_create_leaf(schema, NULL, 0, 1);
+        target = lyd_create_leaf(NULL, schema, NULL, 0, 1);
         LY_CHECK_RETURN(!target, -1);
         break;
     case LYS_LEAFLIST:
         /* used attributes: schema, hash, value_str */
-        target = lyd_create_leaf(schema, key_or_value, 0, 0);
+        target = lyd_create_leaf(NULL, schema, key_or_value, 0, 0);
         LY_CHECK_RETURN(!target, -1);
         break;
     case LYS_LIST:
@@ -6954,7 +6958,7 @@ lyd_find_sibling_val(const struct lyd_node *siblings, const struct lys_node *sch
             LY_CHECK_GOTO(!val, error);
 
             /* create and insert key */
-            node = lyd_create_leaf(key, val, 0, 0);
+            node = lyd_create_leaf(target, key, val, 0, 0);
             if (!node || lyd_insert(target, node)) {
                 lyd_free(node);
                 goto error;
